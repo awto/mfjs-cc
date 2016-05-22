@@ -10,8 +10,6 @@ M.option({ccTest:{
 M.profile("ccTest");
 var CC = require("../");
 
-console.dir(CC)
-
 describe('Oleg', function() {
   var p = CC.newPrompt();
   it('test1', function() {

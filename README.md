@@ -17,6 +17,33 @@ However there is one other thing. Monadic structure provides more information fo
 analyzing and generating more effective code. There is some elaboration about this
 in `@mfjs/compiler’ docs. 
 
+There is a `CC.makeMonad` function, taking `bind`, `pure` functions and predicate
+for checking if the value is monadic and returning. The function returns a
+fully compatible monad definition implemented on top of delimited continuation monad.
+This seem to be an overhead, converting to CC interface and after converting to monad
+interface, but, for some monads, like Rx.Observable this is still faster for parts
+of code without effects.
+
+For example:
+
+```javascript
+var
+  M = require('@mfjs/core'),
+  CC = require('@mfjs/cc'),
+  RxM = CC.makeMonad(
+    Rx.Observable.prototype.flatMapLatest,
+    Rx.Observable.return,
+    Rx.Observable.isObservable
+    );
+  M.profile('defaultFull');
+
+  function f1() {
+    var k = Rx.Observable.from([1,2,3,4]);
+    var l = Rx.Observable.from([10,20,30,40]);
+    return k + l;
+  }
+```
+
 ## Usage
 
 ```

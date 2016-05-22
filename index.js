@@ -26,7 +26,7 @@ function splitAt(seq, p) {
   throw new Error("prompt wasn't found");
 }
 
-function app (v, seq) {
+function app(v, seq) {
   var n;
   if (!seq.length)
     return v;
@@ -72,6 +72,11 @@ AppCC.prototype.runAppC = function() {
   return coerce(this.ce).run(this.k);
 };
 
+/*
+function appCC(ce, k) {
+  return coerce(ce).run(k);
+}
+*/
 function appCC(ce, k) {
   return new AppCC(ce, k);
 }
@@ -85,11 +90,22 @@ function Bind(a, f) {
   this.a = a;
   this.f = f;
 }
+
 Bind.prototype = new CCM();
 
 Bind.prototype.run = function(k) {
   k.unshift({seg: this.f});
   return appCC(this.a, k);
+};
+
+function Reify(f) {
+  this.f = f;
+}
+
+Reify.prototype = new CCM();
+
+Reify.prototype.run = function(k) {
+  return coerce(this.f()).run(k);
 };
 
 function PushPrompt(p, e) {
@@ -143,6 +159,10 @@ CC.prototype.coerce = coerce;
 
 CC.prototype.pure = pure;
 
+CC.prototype.reify = function(f) {
+  return new Reify(f);
+};
+
 CC.prototype.bind = function(a, f) {
   return new Bind(a, f);
 };
@@ -191,10 +211,11 @@ CC.prototype.withSubCont = function(p, f) {
   return new WithSubCont(p, f);
 };
 
-CC.prototype.takeSubCont = CC.withSubCont;
+CC.prototype.takeSubCont = CC.prototype.withSubCont;
 
 /**
-* composes sub-continuation `subk` with current continuation and evaluates its second argument.
+* composes sub-continuation `subk` with current continuation and evaluates 
+* its second argument.
 * @function CC.pushSubCont
 * @param {SubCont} subk
 * @param {CC} e
@@ -208,9 +229,8 @@ CC.prototype.run = function(f) {
   var m;
   m = this;
   return M.withContext(m, function() {
-    return runCC(m.onUnwindBy(m.errorPrompt, f(), function(v) {
-      throw v;
-    }));
+    return runCC(m.onUnwindBy(m.errorPrompt, m.reify(f), 
+      function(v) { throw v; }));
   });
 };
 
@@ -243,7 +263,8 @@ CC.prototype.handle = function(a, f) {
 
 CC.prototype['finally'] = function(a, f) {
   var m = this;
-  return this.bind(this.onUnwindByCont(m.errorPrompt, this.onUnwindByCont(m.topPrompt, a, f), f), f);
+  return this.bind(this.onUnwindByCont(m.errorPrompt, 
+    this.onUnwindByCont(m.topPrompt, a, f), f), f);
 };
 
 CC.prototype.block = function(f) {
@@ -345,6 +366,49 @@ CC.prototype.reset = function(f) {
   return this.pushPrompt(p, f(p));
 };
 
+/** 
+ * Returns monad definitions suitable for @mfjs/compiler from `bind` and `pure`
+ * implementation for it.
+ * 
+ * The generated monad definition will also contain `reflectM` method for 
+ * embedding inner monads 
+ * @function CC.makeMonad
+ * @param {Function} bind
+ * @param {Function} pure
+ * @param {Function} check
+ */
+CC.prototype.makeMonad = function(bind, pure, check) {
+  var prompt = new Prompt(), res, lift, nxt;
+  function Impl() {
+    CC.call(this);
+  }
+  Impl.prototype = new CC();
+  Impl.prototype.reify = function(f) {
+    return this.pushPrompt(prompt, 
+                           this.bind(this.coerce(f()),
+                                     function(v) { return pure(v); }));
+  };
+  Impl.prototype.reflectM = function(v) {
+    var m = this;
+    return this.shift(prompt, function(k) {
+      return bind.call(v,
+        M.liftContext(m,function(vv) { return runCC(k(vv)); }));
+    });
+  };
+  if (check) {
+    Impl.prototype.coerce = function(v) {
+      if (v) {
+        if (v.cc)
+          return v;
+        if (check(v))
+          return this.reflectM(v);
+      }
+      return this.pure(v);
+    };
+  }
+  return M.addContext(new Impl());
+};
+
 CC.prototype.ctor = CCM;
 
 var defs = new CC();
@@ -353,4 +417,5 @@ defs.Defs = CC;
 
 M.completePrototype(defs, CCM.prototype);
 
-module.exports = defs
+module.exports = defs;
+
