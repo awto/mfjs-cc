@@ -72,11 +72,6 @@ AppCC.prototype.runAppC = function() {
   return coerce(this.ce).run(this.k);
 };
 
-/*
-function appCC(ce, k) {
-  return coerce(ce).run(k);
-}
-*/
 function appCC(ce, k) {
   return new AppCC(ce, k);
 }
@@ -225,13 +220,16 @@ CC.prototype.pushSubCont = function(subk, e) {
   return new PushSubCont(subk, e);
 };
 
-CC.prototype.run = function(f) {
-  var m;
-  m = this;
+CC.prototype.exec = function(val) {
+  var m = this;
   return M.withContext(m, function() {
-    return runCC(m.onUnwindBy(m.errorPrompt, m.reify(f), 
+    return runCC(m.onUnwindBy(m.errorPrompt, val,
       function(v) { throw v; }));
   });
+}
+
+CC.prototype.run = function(f) {
+  return this.exec(this.reify(f))
 };
 
 CC.prototype.raise = function(e) {
@@ -388,7 +386,7 @@ CC.prototype.makeMonad = function(bind, pure, check) {
                            this.bind(this.coerce(f()),
                                      function(v) { return pure(v); }));
   };
-  Impl.prototype.reflectM = function(v) {
+  Impl.prototype.reflect = function(v) {
     var m = this;
     return this.shift(prompt, function(k) {
       return bind.call(v,
@@ -401,7 +399,7 @@ CC.prototype.makeMonad = function(bind, pure, check) {
         if (v.cc)
           return v;
         if (check(v))
-          return this.reflectM(v);
+          return this.reflect(v);
       }
       return this.pure(v);
     };
