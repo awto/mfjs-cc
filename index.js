@@ -23,7 +23,8 @@ function splitAt(seq, p) {
       return pref;
     }
   }
-  throw new Error("prompt wasn't found");
+  
+  throw new Error("prompt" + p.descr() + " wasn't found");
 }
 
 function app(v, seq) {
@@ -42,7 +43,20 @@ function app(v, seq) {
 function CCM() {}  
 CCM.prototype.cc = true;
 
-function Prompt() {}
+var promptId = 0;
+
+function Prompt(name) {
+  this.name = name;
+  this.id = promptId++;
+}
+
+Prompt.prototype.descr = function() {
+  var res = "{";
+  if(this.name)
+    res+=this.name + "@";
+  res += this.id + "}";
+  return res;
+}
 
 function coerce(v) {
   if ((v != null) && v.cc)
@@ -74,6 +88,7 @@ AppCC.prototype.runAppC = function() {
 
 function appCC(ce, k) {
   return new AppCC(ce, k);
+//  return coerce(ce).run(k);
 }
 
 function runCC(ce) {
@@ -144,8 +159,8 @@ function Unwind(val, tag) {
 }
 
 function CC() {
-  this.topPrompt = new Prompt();
-  this.errorPrompt = new Prompt();
+  this.topPrompt = new Prompt("top");
+  this.errorPrompt = new Prompt("error");
 }
 
 CC.prototype = new M.MonadDict();
@@ -171,8 +186,8 @@ CC.prototype.apply = function(a, f) {
 * @function CC.newPrompt
 * @return {Prompt}
 */
-CC.prototype.newPrompt = function() {
-  return new Prompt();
+CC.prototype.newPrompt = function(name) {
+  return new Prompt(name);
 };
 
 
@@ -376,7 +391,7 @@ CC.prototype.reset = function(f) {
  * @param {Function} check
  */
 CC.prototype.makeMonad = function(bind, pure, check) {
-  var prompt = new Prompt(), res, lift, nxt;
+  var prompt = new Prompt("monad"), res, lift, nxt;
   function Impl() {
     CC.call(this);
   }
