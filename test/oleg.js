@@ -60,7 +60,7 @@ describe('Oleg', function() {
       });
       fail('should throw');
     } catch(e) {
-      expect(e.message).to.equal("prompt wasn't found");
+      expect(e.message).to.equal("prompt" + p.descr() + " wasn't found");
     }
   });
   it("test4", function() {

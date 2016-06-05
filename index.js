@@ -41,7 +41,7 @@ function app(v, seq) {
 };
 
 function CCM() {}  
-CCM.prototype.cc = true;
+CCM.prototype.top = CCM;
 
 var promptId = 0;
 
@@ -59,7 +59,7 @@ Prompt.prototype.descr = function() {
 }
 
 function coerce(v) {
-  if ((v != null) && v.cc)
+  if ((v != null) && v.top === CCM)
     return v;
   return pure(v);
 };
@@ -72,10 +72,20 @@ function Pure(val) {
   this.val = val;
 }
 Pure.prototype = new CCM();
+Pure.prototype.constructor = Pure;
 
 Pure.prototype.run = function(k) {
   return app(this.val, k);
 };
+
+Pure.prototype.mapply = function(f) {
+  this.val = f(this.val);
+  return this;
+};
+
+Pure.prototype.mbind = function(f) {
+  return coerce(f(this.val));
+}
 
 function AppCC(ce, k) {
   this.ce = ce;
@@ -102,6 +112,7 @@ function Bind(a, f) {
 }
 
 Bind.prototype = new CCM();
+Bind.prototype.constructor = Bind;
 
 Bind.prototype.run = function(k) {
   k.unshift({seg: this.f});
@@ -113,6 +124,7 @@ function Reify(f) {
 }
 
 Reify.prototype = new CCM();
+Reify.prototype.constructor = Reify;
 
 Reify.prototype.run = function(k) {
   return coerce(this.f()).run(k);
@@ -124,6 +136,7 @@ function PushPrompt(p, e) {
 }
 
 PushPrompt.prototype = new CCM();
+PushPrompt.prototype.constructor = PushPrompt;
 
 PushPrompt.prototype.run = function(k) {
   k.unshift({prompt: this.p});
@@ -136,6 +149,7 @@ function WithSubCont(p, f) {
 }
 
 WithSubCont.prototype = new CCM();
+WithSubCont.prototype.constructor = WithSubCont;
 
 WithSubCont.prototype.run = function(k) {
   return appCC(this.f(splitAt(k, this.p)), k);
@@ -147,11 +161,13 @@ function PushSubCont(subk, arg) {
 }
 
 PushSubCont.prototype = new CCM();
+PushSubCont.prototype.constructor = PushSubCont;
 
 PushSubCont.prototype.run = function(k) {
   k.unshift.apply(k, this.subk);
   return appCC(this.arg, k);
 };
+
 
 function Unwind(val, tag) {
   this.val = val;
@@ -173,12 +189,20 @@ CC.prototype.reify = function(f) {
   return new Reify(f);
 };
 
+CCM.prototype.mbind = function(f) {
+  return new Bind(this, f);
+}
+
 CC.prototype.bind = function(a, f) {
-  return new Bind(a, f);
+  return coerce(a).mbind(f);
 };
 
+CCM.prototype.mapply = function(f) {
+  return new Bind(this, function(v) { return pure(f(v)); });
+}
+
 CC.prototype.apply = function(a, f) {
-  return new Bind(a, f);
+  return coerce(a).mapply(f);
 };
 
 /**
@@ -411,7 +435,7 @@ CC.prototype.makeMonad = function(bind, pure, check) {
   if (check) {
     Impl.prototype.coerce = function(v) {
       if (v) {
-        if (v.cc)
+        if (v.top === CCM)
           return v;
         if (check(v))
           return this.reflect(v);
@@ -430,5 +454,69 @@ defs.Defs = CC;
 
 M.completePrototype(defs, CCM.prototype);
 
+
+function Repeat(body, arg) {
+  this.body = body;
+  this.arg = arg;
+}
+
+Repeat.prototype = new CCM();
+Repeat.prototype.constructor = Repeat;
+
+Repeat.prototype.run = function (k) {
+  var body = this.body;
+  function iter(arg) {
+    var i;
+    k.unshift({seg:iter});
+    for(;;) {
+      i = coerce(body(arg)); // TODO: remove coerce
+      if (i.constructor !== Pure)
+        return i;
+      arg = i.val;
+    }
+    return body(arg);
+  }
+  return appCC(iter(this.arg), k);
+}
+
+CC.prototype.repeat = function(body, arg) {
+  return new Repeat(body, arg);
+}
+
+function ForPar(test, body, upd, arg) {
+  this.test = test;
+  this.body = body;
+  this.upd = upd;
+  this.arg = arg;
+}
+
+ForPar.prototype = new CCM();
+ForPar.prototype.constructor = ForPar;
+
+ForPar.prototype.run = function(k) {
+  var test = this.test, upd = this.upd, body = this.body;
+  if (!test(this.arg))
+    return app(this.arg, k);
+  function iter(arg) {
+    var b;
+    for(;;) {
+      if (!test(arg))
+        return pure(arg);
+      b = coerce(body(arg)); // TODO: remove
+      arg = upd(arg)
+      if (b.constructor !== Pure)
+        break;
+    }
+    k.unshift({seg:function() { return iter(arg); }});
+    return b;
+  }
+  return appCC(iter(this.arg),k);
+}
+
+CC.prototype.forPar = function(test, body, upd, arg) {
+  return new ForPar(test,body,upd,arg);
+}
+
 module.exports = defs;
+
 
