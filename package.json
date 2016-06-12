@@ -14,7 +14,7 @@
     "url": "https://github.com/awto/mfjs-cc.git"
   },
   "peerDependencies": {
-    "@mfjs/core": "~1.1.0"
+    "@mfjs/core": "~1.2.0"
   },
   "devDependencies": {
     "@mfjs/compiler": "~1.1.0",

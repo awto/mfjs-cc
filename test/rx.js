@@ -23,6 +23,7 @@ if (Rx) {
     Rx.Observable.prototype.flatMapLatest,
     Rx.Observable.return,
     Rx.Observable.isObservable);
+  // M.setContext(RxM);
 }
 
 function eff(v) {
@@ -78,6 +79,7 @@ describe('rx using cc with effects', function() {
       })
       check(k,[1,2,3,4],done)
     })
+    
     it_('should work like flatMapLatest', function(done) {
       var o1 = Rx.Observable.from([1,2,3,4]), o2 = Rx.Observable.from([10,20,30,40])
       var k = RxM.run(function() {
