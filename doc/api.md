@@ -53,7 +53,8 @@ subcontinuation, is selected.
 
 ## CC.pushSubCont(subk, e)
 
-composes sub-continuation `subk` with current continuation and evaluates its second argument.
+composes sub-continuation `subk` with current continuation and evaluates 
+its second argument.
 
 ### Params:
 
@@ -129,6 +130,20 @@ composes sub-continuation `subk` with current continuation and evaluates its sec
 ### Return:
 
 * **CC** 
+
+## CC.makeMonad(bind, pure, check)
+
+Returns monad definitions suitable for @mfjs/compiler from `bind` and `pure`
+implementation for it.
+
+The generated monad definition will also contain `reflect` method for 
+embedding inner monads 
+
+### Params:
+
+* **Function** *bind* 
+* **Function** *pure* 
+* **Function** *check* 
 
 <!-- End index.js -->
 
